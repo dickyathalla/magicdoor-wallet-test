@@ -30,7 +30,7 @@ class WalletConnector {
             }
 
             let attempts = 0;
-            const maxAttempts = 50; // 5 seconds max wait
+            const maxAttempts = 50;
             
             const checkMetaMask = () => {
                 attempts++;
@@ -91,6 +91,8 @@ class WalletConnector {
         } catch (error) {
             console.error('Connection failed:', error);
             
+            this.disconnect();
+            
             if (error.code === 4001) {
                 this.updateStatus('Connection rejected', 'error');
             } else if (error.code === -32002) {
@@ -114,9 +116,29 @@ class WalletConnector {
             }
         });
 
+        window.ethereum.on('disconnect', () => {
+            this.disconnect();
+        });
+
         window.ethereum.on('chainChanged', () => {
             window.location.reload();
         });
+
+        setInterval(() => this.checkConnection(), 3000);
+    }
+
+    async checkConnection() {
+        if (!this.isConnected) return;
+        
+        try {
+            const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+            if (accounts.length === 0 || !accounts.includes(this.account)) {
+                this.disconnect();
+            }
+        } catch (error) {
+            console.log('Connection check failed:', error);
+            this.disconnect();
+        }
     }
 
     async updateBalance() {
@@ -130,6 +152,9 @@ class WalletConnector {
         } catch (error) {
             console.error('Failed to get balance:', error);
             this.balance = '0.0000';
+            if (error.message?.includes('Extension context invalidated')) {
+                this.disconnect();
+            }
         }
     }
 
